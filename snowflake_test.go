@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestMain(t *testing.T) {
@@ -16,16 +17,58 @@ func TestMain(t *testing.T) {
 // General Test funcs
 
 func TestNew(t *testing.T) {
+	// Default
 	_, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error snowflake.New %s", err)
 	}
-
+	// Node
 	_, err = New(Node(2000))
 	if err == nil {
-		t.Fatal("no error creating NewNode")
+		t.Fatal("no error snowflake.New with Node option")
 	}
+	// StartTime
+	_, err = New(StartTime(time.Now().AddDate(0, 0, 1).UnixNano() / 1e6))
+	if err == nil {
+		t.Fatal("no error snowflake.New with StartTime option")
+	}
+}
+func TestOption(t *testing.T) {
+	opts := []Option{Node(12), StartTime(1014729292099), NodeBits(5), SeqBits(12)}
+	sf := MustNew(opts...)
+	id := sf.ID()
+	t.Logf("[TestOption] ID=%v, [%13d|%04d|%04d], Time=%v, elapsedTime=%d, MaxTime=%d, MaxNode=%d, MaxSeq=%d, lifetime=%v\n",
+		id, id.Time(opts...), id.Node(opts...), id.Seq(opts...),
+		id.StdTime(opts...),
+		id.Time(opts...)-sf.StartTime(), sf.MaxTime(), sf.MaxNode(), sf.MaxSeq(), sf.Lifetime(),
+	)
 
+	opts = []Option{Node(13)}
+	sf = MustNew(opts...)
+	id = sf.ID()
+	t.Logf("[TestOption] ID=%v, [%13d|%04d|%04d], Time=%v, elapsedTime=%d, MaxTime=%d, MaxNode=%d, MaxSeq=%d, lifetime=%v\n",
+		id, id.Time(opts...), id.Node(opts...), id.Seq(opts...),
+		id.StdTime(opts...),
+		id.Time(opts...)-sf.StartTime(), sf.MaxTime(), sf.MaxNode(), sf.MaxSeq(), sf.Lifetime(),
+	)
+
+	opts = []Option{Node(14), NodeBits(8)}
+	sf = MustNew(opts...)
+	id = sf.ID()
+	t.Logf("[TestOption] ID=%v, [%13d|%04d|%04d], Time=%v, elapsedTime=%d, MaxTime=%d, MaxNode=%d, MaxSeq=%d, lifetime=%v\n",
+		id, id.Time(opts...), id.Node(opts...), id.Seq(opts...),
+		id.StdTime(opts...),
+		id.Time(opts...)-sf.StartTime(), sf.MaxTime(), sf.MaxNode(), sf.MaxSeq(), sf.Lifetime(),
+	)
+
+	opts = []Option{Node(15), StartTime(Epoch(time.Now()))}
+	sf = MustNew(opts...)
+	id = sf.ID()
+	t.Logf("[TestOption] ID=%v, [%13d|%04d|%04d], Time=%v, elapsedTime=%d, MaxTime=%d, MaxNode=%d, MaxSeq=%d, lifetime=%v\n",
+		id, id.Time(opts...), id.Node(opts...), id.Seq(opts...),
+		id.StdTime(opts...),
+		id.Time(opts...)-sf.StartTime(), sf.MaxTime(), sf.MaxNode(), sf.MaxSeq(), sf.Lifetime(),
+	)
 }
 
 // lazy check if Generate will create duplicate IDs
