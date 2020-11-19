@@ -102,11 +102,7 @@ func init() {
 // New 创建 Snowflake 实例
 func New(opts ...Option) (*Snowflake, error) {
 	// default
-	options := Options{
-		startTime: DefaultStartTime,
-		nodeBits:  DefaultNodeBits,
-		seqBits:   DefaultSeqBits,
-	}
+	options := defaultOptions()
 	// options
 	for _, o := range opts {
 		o(&options)
@@ -142,6 +138,14 @@ func MustNew(opts ...Option) *Snowflake {
 
 //********************************************************************************
 // Snowflake Options
+
+func defaultOptions() Options {
+	return Options{
+		startTime: DefaultStartTime,
+		nodeBits:  DefaultNodeBits,
+		seqBits:   DefaultSeqBits,
+	}
+}
 
 // Node设置节点
 func Node(node int64) Option {
@@ -332,11 +336,7 @@ func (sf *Snowflake) elapsedTime() int64 {
 
 // Time 获取 ID 表示的时间整型值
 func (f ID) Time(opts ...Option) int64 {
-	options := Options{
-		startTime: DefaultStartTime,
-		nodeBits:  DefaultNodeBits,
-		seqBits:   DefaultSeqBits,
-	}
+	options := defaultOptions()
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -345,11 +345,7 @@ func (f ID) Time(opts ...Option) int64 {
 
 // Time 获取 ID 表示的标准时间类型值
 func (f ID) StdTime(opts ...Option) time.Time {
-	options := Options{
-		startTime: DefaultStartTime,
-		nodeBits:  DefaultNodeBits,
-		seqBits:   DefaultSeqBits,
-	}
+	options := defaultOptions()
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -358,11 +354,7 @@ func (f ID) StdTime(opts ...Option) time.Time {
 
 // Node() 获取 ID 表示的节点值
 func (f ID) Node(opts ...Option) int64 {
-	options := Options{
-		startTime: DefaultStartTime,
-		nodeBits:  DefaultNodeBits,
-		seqBits:   DefaultSeqBits,
-	}
+	options := defaultOptions()
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -374,11 +366,7 @@ func (f ID) Node(opts ...Option) int64 {
 
 // Seq() 获取 ID 表示的序列值
 func (f ID) Seq(opts ...Option) int64 {
-	options := Options{
-		startTime: DefaultStartTime,
-		nodeBits:  DefaultNodeBits,
-		seqBits:   DefaultSeqBits,
-	}
+	options := defaultOptions()
 	for _, opt := range opts {
 		opt(&options)
 	}
