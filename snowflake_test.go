@@ -19,7 +19,7 @@ func TestMain(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	// Default
-	_, err := New(NodeBits(18))
+	_, err := New(NodeBits(8))
 	if err != nil {
 		t.Fatalf("error snowflake.New %s", err)
 	}
@@ -49,11 +49,11 @@ func TestBits(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		rand.Seed(time.Now().UnixNano())
-		maxNodeBits := uint8(rand.Intn(int(MaxNotTimeBits)))
+		maxNodeBits := uint8(rand.Intn(int(MaxNotTimeBits - 1)))
 		maxSeqBits := MaxNotTimeBits - maxNodeBits
 		t.Logf("maxNodeBits = %d, maxSeqBits = %d\n", maxNodeBits, maxSeqBits)
-		nodeBits := uint8(rand.Intn(int(maxNodeBits)))
-		seqBits := uint8(rand.Intn(int(maxSeqBits)))
+		nodeBits := uint8(rand.Intn(int(maxNodeBits) + 1))
+		seqBits := uint8(rand.Intn(int(maxSeqBits)) + 1)
 		opts := []Option{Verbose(), NodeBits(nodeBits), SeqBits(seqBits)}
 		sf = MustNew(opts...)
 		id = sf.ID()
