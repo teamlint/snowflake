@@ -24,8 +24,8 @@ const (
 	DefaultStartTime int64 = 1288834974657 // 开始时间, UTC 时间 2010-11-04 01:42:54
 	DefaultNodeBits  uint8 = 10            // 节点位数
 	DefaultSeqBits   uint8 = 12            // 序列位数
-
-	MaxBits uint8 = 64 // 最大位数
+	MaxBits          uint8 = 64            // 最大位数
+	MaxNotTimeBits   uint8 = 22            // 最大非时间段位数
 
 	EnvStartTime = "SNOWFLAKE_START_TIME" // 环境变量 开始时间
 	EnvNode      = "SNOWFLAKE_NODE"       // 环境变量 节点
@@ -123,9 +123,12 @@ func New(opts ...Option) (*Snowflake, error) {
 
 	// 初始化配置, 仅当配置项值为 0 时才使用环境变量
 	sf.initBits()
+	if sf.NotTimeBits() > MaxNotTimeBits {
+		return nil, fmt.Errorf("Sum(%d) of node bits and sequence bits must be less than %d", sf.NotTimeBits(), MaxNotTimeBits)
+	}
 	sf.initStartTime()
 	if sf.elapsedTime() < 0 {
-		return nil, fmt.Errorf("StartTime number(%d) must be before now's epoch(%d)", sf.opts.startTime, epoch(time.Now()))
+		return nil, fmt.Errorf("Start time number(%d) must be before now's epoch(%d)", sf.opts.startTime, epoch(time.Now()))
 	}
 	sf.initNode()
 	if sf.node < 0 || sf.node > sf.nodeMax {
@@ -136,11 +139,11 @@ func New(opts ...Option) (*Snowflake, error) {
 	log.Printf("| 1 Bit Unused | %2d Bit Timestamp |  %2d Bit NodeID  |   %2d Bit Sequence ID |\n",
 		sf.TimeBits(), sf.NodeBits(), sf.SeqBits())
 	log.Println("+--------------------------------------------------------------------------+")
-	log.Printf("[Snowflake] Node = %d\n", sf.Node())
-	log.Printf("[Snowflake] MaxTime = %d\tMaxNode = %d\tMaxseq = %d\n", sf.MaxTime(), sf.MaxNode(), sf.MaxSeq())
-	log.Printf("[Snowflake] StartTime = %d\n", sf.StartTime())
-	log.Printf("[Snowflake] StartStdTime = %v\n", sf.StartStdTime())
-	log.Printf("[Snowflake] Lifetime = %v\n\n", sf.Lifetime())
+	log.Printf("Node = %d\n", sf.Node())
+	log.Printf("MaxTime = %d\tMaxNode = %d\tMaxseq = %d\n", sf.MaxTime(), sf.MaxNode(), sf.MaxSeq())
+	log.Printf("StartTime = %d\n", sf.StartTime())
+	log.Printf("StartStdTime = %v\n", sf.StartStdTime())
+	log.Printf("Lifetime = %v\n\n", sf.Lifetime())
 
 	return &sf, nil
 }
@@ -196,7 +199,7 @@ func SeqBits(seqBits uint8) Option {
 // Verbose 输出详细信息
 func Verbose() Option {
 	log.SetOutput(os.Stderr)
-	log.SetPrefix("[Snowflake]")
+	log.SetPrefix("[Snowflake] ")
 	return func(o *Options) {
 	}
 }
@@ -396,6 +399,11 @@ func (sf *Snowflake) StartStdTime() time.Time {
 // TimeBits 获取可配置时间最大位数
 func (sf *Snowflake) TimeBits() uint8 {
 	return MaxBits - sf.opts.nodeBits - sf.opts.seqBits - 1
+}
+
+// NotTimeBits 非时间段位数
+func (sf *Snowflake) NotTimeBits() uint8 {
+	return sf.opts.nodeBits + sf.opts.seqBits
 }
 
 // NodeBits 获取可配置节点最大位数

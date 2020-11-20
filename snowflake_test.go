@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"bytes"
+	"math/rand"
 	"reflect"
 	"testing"
 	"time"
@@ -38,21 +39,26 @@ func TestNew(t *testing.T) {
 	}
 }
 func TestBits(t *testing.T) {
-	startTime, _ := time.Parse(time.RFC3339, "2020-01-02T15:04:05.678Z")
-	t.Log(startTime)
-	opts := []Option{Verbose(), NodeBits(9), StartTime(Epoch(startTime))}
+	// startTime, _ := time.Parse(time.RFC3339, "2020-01-02T15:04:05.678Z")
+	// t.Log(startTime)
+	// opts := []Option{Verbose(), NodeBits(8), StartTime(Epoch(startTime))}
+	opts := []Option{Verbose(), NodeBits(9)}
 	sf := MustNew(opts...)
 	id := sf.ID()
 	t.Logf("ID = %v, timestamp = %d, time = %v, elapsedTime = %v \n\n ", id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
 
-	// for i := 0; i < 5; i++ {
-	// 	rand.Seed(time.Now().UnixNano())
-	// 	nodeBits := uint8(rand.Intn(32))
-	// 	seqBits := uint8(rand.Intn(32))
-	// 	sf = MustNew(NodeBits(nodeBits), SeqBits(seqBits))
-	// 	id = sf.ID()
-	// 	t.Logf("ID = %d, timestamp = %d, time = %v\n\n ", id.Int64(), id.Time(), id.StdTime())
-	// }
+	for i := 0; i < 10; i++ {
+		rand.Seed(time.Now().UnixNano())
+		maxNodeBits := uint8(rand.Intn(int(MaxNotTimeBits)))
+		maxSeqBits := MaxNotTimeBits - maxNodeBits
+		t.Logf("maxNodeBits = %d, maxSeqBits = %d\n", maxNodeBits, maxSeqBits)
+		nodeBits := uint8(rand.Intn(int(maxNodeBits)))
+		seqBits := uint8(rand.Intn(int(maxSeqBits)))
+		opts := []Option{Verbose(), NodeBits(nodeBits), SeqBits(seqBits)}
+		sf = MustNew(opts...)
+		id = sf.ID()
+		t.Logf("ID = %v, timestamp = %d, time = %v, elapsedTime = %v \n ", id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
+	}
 }
 func TestEnv(t *testing.T) {
 	MustNew(Env())
