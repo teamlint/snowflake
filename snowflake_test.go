@@ -18,20 +18,44 @@ func TestMain(t *testing.T) {
 
 func TestNew(t *testing.T) {
 	// Default
-	_, err := New()
+	_, err := New(NodeBits(18))
 	if err != nil {
 		t.Fatalf("error snowflake.New %s", err)
 	}
-	// Node
+	MustNew()
+	// Overflow
 	_, err = New(Node(2000))
 	if err == nil {
 		t.Fatal("no error snowflake.New with Node option")
 	}
-	// StartTime
-	_, err = New(StartTime(time.Now().AddDate(0, 0, 1).UnixNano() / 1e6))
-	if err == nil {
-		t.Fatal("no error snowflake.New with StartTime option")
+	// set node
+	sf, err := New(Node(135))
+	if err != nil {
+		t.Fatalf("error snowflake.New %s", err)
 	}
+	if sf.Node() != 135 {
+		t.Fatalf("error snowflake.New with Node option 135, but it is %d", sf.Node())
+	}
+}
+func TestBits(t *testing.T) {
+	startTime, _ := time.Parse(time.RFC3339, "2020-01-02T15:04:05.678Z")
+	t.Log(startTime)
+	opts := []Option{NodeBits(9), StartTime(Epoch(startTime))}
+	sf := MustNew(opts...)
+	id := sf.ID()
+	t.Logf("ID = %v, timestamp = %d, time = %v, elapsedTime = %v \n\n ", id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
+
+	// for i := 0; i < 5; i++ {
+	// 	rand.Seed(time.Now().UnixNano())
+	// 	nodeBits := uint8(rand.Intn(32))
+	// 	seqBits := uint8(rand.Intn(32))
+	// 	sf = MustNew(NodeBits(nodeBits), SeqBits(seqBits))
+	// 	id = sf.ID()
+	// 	t.Logf("ID = %d, timestamp = %d, time = %v\n\n ", id.Int64(), id.Time(), id.StdTime())
+	// }
+}
+func TestEnv(t *testing.T) {
+	MustNew(Env())
 }
 func TestOption(t *testing.T) {
 	opts := []Option{Node(12), StartTime(1014729292099), NodeBits(5), SeqBits(12)}
@@ -52,7 +76,7 @@ func TestOption(t *testing.T) {
 		id.Time(opts...)-sf.StartTime(), sf.MaxTime(), sf.MaxNode(), sf.MaxSeq(), sf.Lifetime(),
 	)
 
-	opts = []Option{Node(14), NodeBits(8)}
+	opts = []Option{Node(14), NodeBits(9)}
 	sf = MustNew(opts...)
 	id = sf.ID()
 	t.Logf("[TestOption] ID=%v, [%13d|%04d|%04d], Time=%v, elapsedTime=%d, MaxTime=%d, MaxNode=%d, MaxSeq=%d, lifetime=%v\n",
@@ -149,11 +173,12 @@ func TestInt64(t *testing.T) {
 		t.Fatalf("pID %v != oID %v", pID, oID)
 	}
 
-	mi := int64(1116766490855473152)
+	mi := int64(1329599227386400929) // db generated
 	pID = ParseInt64(mi)
 	if pID.Int64() != mi {
 		t.Fatalf("pID %v != mi %v", pID.Int64(), mi)
 	}
+	t.Logf("[TestInt64] id=%d, stdtime=%v, time=%d, node=%d, seq=%d\n", pID, pID.StdTime(), pID.Time(), pID.Node(), pID.Seq())
 
 }
 

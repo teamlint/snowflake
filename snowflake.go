@@ -5,6 +5,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
+	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -19,9 +22,14 @@ import (
 const (
 	DefaultStartTime int64 = 1288834974657 // 开始时间, UTC 时间 2010-11-04 01:42:54
 	DefaultNodeBits  uint8 = 10            // 节点位数
-	DefaultSeqBits   uint8 = 12            // 递增位数
+	DefaultSeqBits   uint8 = 12            // 序列位数
 
 	MaxBits uint8 = 64 // 最大位数
+
+	EnvStartTime = "SNOWFLAKE_START_TIME" // 环境变量 开始时间
+	EnvNode      = "SNOWFLAKE_NODE"       // 环境变量 节点
+	EnvNodeBits  = "SNOWFLAKE_NODE_BITS"  // 环境变量 节点位数
+	EnvSeqBits   = "SNOWFLAKE_SEQ_BITS"   // 环境变量 序列位数
 )
 
 // Options 配置项
@@ -109,20 +117,27 @@ func New(opts ...Option) (*Snowflake, error) {
 	}
 
 	sf := Snowflake{opts: options}
-	sf.node = sf.opts.node
-	sf.nodeMax = -1 ^ (-1 << sf.opts.nodeBits)  // 1023
-	sf.nodeMask = sf.nodeMax << sf.opts.seqBits // 4190208, 暂未使用
-	sf.seqMask = -1 ^ (-1 << sf.opts.seqBits)   // 4095
-	// startTime check
-	now := epoch(time.Now())
-	if (now - sf.opts.startTime) < 0 {
-		return nil, fmt.Errorf("StartTime number(%d) must be before now's epoch(%d)", sf.opts.startTime, now)
-	}
 
-	// node check
+	// 初始化配置, 仅当配置项值为 0 时才使用环境变量
+	sf.initBits()
+	sf.initStartTime()
+	if sf.elapsedTime() < 0 {
+		return nil, fmt.Errorf("StartTime number(%d) must be before now's epoch(%d)", sf.opts.startTime, epoch(time.Now()))
+	}
+	sf.initNode()
 	if sf.node < 0 || sf.node > sf.nodeMax {
 		return nil, errors.New("Node number must be between 0 and " + strconv.FormatInt(sf.nodeMax, 10))
 	}
+
+	log.Println("+---------------------------- Snowflake -----------------------------------+")
+	log.Printf("| 1 Bit Unused | %2d Bit Timestamp |  %2d Bit NodeID  |   %2d Bit Sequence ID |\n",
+		sf.TimeBits(), sf.NodeBits(), sf.SeqBits())
+	log.Println("+--------------------------------------------------------------------------+")
+	log.Printf("[Snowflake] Node = %d\n", sf.Node())
+	log.Printf("[Snowflake] MaxTime = %d\tMaxNode = %d\tMaxseq = %d\n", sf.MaxTime(), sf.MaxNode(), sf.MaxSeq())
+	log.Printf("[Snowflake] StartTime = %d\n", sf.StartTime())
+	log.Printf("[Snowflake] StartStdTime = %v\n", sf.StartStdTime())
+	log.Printf("[Snowflake] Lifetime = %v\n\n", sf.Lifetime())
 
 	return &sf, nil
 }
@@ -172,6 +187,18 @@ func NodeBits(nodeBits uint8) Option {
 func SeqBits(seqBits uint8) Option {
 	return func(o *Options) {
 		o.seqBits = seqBits
+	}
+}
+
+// Env 使用环境变量配置
+// 配置值 必须为 0 值时才能使用环境变量
+// node 值不使用此选项时同样可以直接使用环境变量, 因为 node 默认值是 0
+func Env() Option {
+	return func(o *Options) {
+		o.startTime = 0
+		o.node = 0
+		o.nodeBits = 0
+		o.seqBits = 0
 	}
 }
 
@@ -269,6 +296,38 @@ func toTime(epoch int64) time.Time {
 	return time.Unix(epoch/1e3, epoch%1e3*1e6)
 }
 
+func privateIPv4() (net.IP, error) {
+	as, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, a := range as {
+		ipnet, ok := a.(*net.IPNet)
+		if !ok || ipnet.IP.IsLoopback() {
+			continue
+		}
+
+		ip := ipnet.IP.To4()
+		if isPrivateIPv4(ip) {
+			return ip, nil
+		}
+	}
+	return nil, errors.New("no private ip address")
+}
+
+func isPrivateIPv4(ip net.IP) bool {
+	return ip != nil &&
+		(ip[0] == 10 || ip[0] == 172 && (ip[1] >= 16 && ip[1] < 32) || ip[0] == 192 && ip[1] == 168)
+}
+
+// func getEnv(key, fallback string) string {
+// 	if value, ok := os.LookupEnv(key); ok {
+// 		return value
+// 	}
+// 	return fallback
+// }
+
 //********************************************************************************
 // Snowflake
 
@@ -277,7 +336,6 @@ func (sf *Snowflake) ID() ID {
 	sf.mu.Lock()
 
 	elapsedTime := sf.elapsedTime()
-
 	if sf.time == elapsedTime {
 		sf.seq = (sf.seq + 1) & sf.seqMask
 		// 如果当前序列超出12bit长度,即大于4095，则需要等待下一毫秒
@@ -290,9 +348,7 @@ func (sf *Snowflake) ID() ID {
 	} else {
 		sf.seq = 0
 	}
-
 	sf.time = elapsedTime
-
 	id := sf.time<<(sf.opts.nodeBits+sf.opts.seqBits) |
 		sf.node<<sf.opts.seqBits |
 		sf.seq
@@ -321,6 +377,31 @@ func (sf *Snowflake) StartTime() int64 {
 	return sf.opts.startTime
 }
 
+// StartStdTime 获取配置起始标准时间类型值
+func (sf *Snowflake) StartStdTime() time.Time {
+	return toTime(sf.opts.startTime)
+}
+
+// TimeBits 获取可配置时间最大位数
+func (sf *Snowflake) TimeBits() uint8 {
+	return MaxBits - sf.opts.nodeBits - sf.opts.seqBits - 1
+}
+
+// NodeBits 获取可配置节点最大位数
+func (sf *Snowflake) NodeBits() uint8 {
+	return sf.opts.nodeBits
+}
+
+// SeqBits 获取可配置序列最大位数
+func (sf *Snowflake) SeqBits() uint8 {
+	return sf.opts.seqBits
+}
+
+// Node 获取配置节点值
+func (sf *Snowflake) Node() int64 {
+	return sf.node
+}
+
 // Lifetime 返回可生成的生命
 func (sf *Snowflake) Lifetime() time.Time {
 	return toTime(sf.MaxTime() + sf.opts.startTime)
@@ -329,6 +410,75 @@ func (sf *Snowflake) Lifetime() time.Time {
 // elapsedTime 获取消逝时间
 func (sf *Snowflake) elapsedTime() int64 {
 	return epoch(time.Now()) - sf.opts.startTime
+}
+
+// initStartTime 初始化开始时间
+func (sf *Snowflake) initStartTime() {
+	if sf.opts.startTime == 0 {
+		if envVal, ok := os.LookupEnv(EnvStartTime); ok {
+			if val, err := strconv.ParseInt(envVal, 10, 64); err == nil {
+				sf.opts.startTime = val
+				// log.Printf("[initStartTime] env=%v, act=%v\n", val, sf.opts.startTime)
+			}
+		}
+	}
+
+}
+
+// initBits 初始化 ID 各段位数
+func (sf *Snowflake) initBits() {
+	// node bits
+	if sf.opts.nodeBits == 0 {
+		if envVal, ok := os.LookupEnv(EnvNodeBits); ok {
+			if val, err := strconv.ParseUint(envVal, 10, 8); err == nil {
+				sf.opts.nodeBits = uint8(val)
+				// log.Printf("[initBits] nodeBits.env=%v, nodeBits.act=%v\n", val, sf.opts.nodeBits)
+			}
+		}
+	}
+	// seq bits
+	if sf.opts.seqBits == 0 {
+		if envVal, ok := os.LookupEnv(EnvSeqBits); ok {
+			if val, err := strconv.ParseUint(envVal, 10, 8); err == nil {
+				sf.opts.seqBits = uint8(val)
+				// log.Printf("[initBits] seqBits.env=%v, seqBits.act=%v\n", val, sf.opts.seqBits)
+			}
+		}
+	}
+	sf.nodeMax = -1 ^ (-1 << sf.opts.nodeBits)  // 1023
+	sf.nodeMask = sf.nodeMax << sf.opts.seqBits // 4190208
+	sf.seqMask = -1 ^ (-1 << sf.opts.seqBits)   // 4095, 序列段在最后一段,所以掩码和最大值是一样的
+}
+
+// initNode 初始化节点值
+func (sf *Snowflake) initNode() {
+	sf.node = sf.opts.node
+	if sf.node == 0 {
+		// 查找环境变量
+		if envVal, ok := os.LookupEnv(EnvNode); ok {
+			if val, err := strconv.ParseInt(envVal, 10, 64); err == nil {
+				sf.node = val & sf.nodeMax
+				// log.Printf("[initNode][%d](%d) env=%v, act=%v\n", sf.opts.nodeBits, sf.nodeMax, val, sf.node)
+				return
+			}
+		}
+		// 查找主机私有 IP 地址, 作为节点值
+		if val, err := sf.ip2Node(); err == nil {
+			sf.node = val
+			// log.Printf("[initNode][%d](%d) ip=%v, act=%v\n", sf.opts.nodeBits, sf.nodeMax, val, sf.node)
+			return
+		}
+	}
+}
+
+// ip2Node 使用私有 IP 作为节点值
+func (sf *Snowflake) ip2Node() (int64, error) {
+	ip, err := privateIPv4()
+	if err != nil {
+		return 0, err
+	}
+	intIP := int64(ip[0])<<24 + int64(ip[1])<<16 + int64(ip[2])<<8 + int64(ip[3])
+	return int64(intIP & sf.nodeMax), nil
 }
 
 //********************************************************************************
@@ -340,7 +490,7 @@ func (f ID) Time(opts ...Option) int64 {
 	for _, opt := range opts {
 		opt(&options)
 	}
-	return int64(f)>>(options.nodeBits+options.seqBits) + options.startTime
+	return (int64(f) >> (options.nodeBits + options.seqBits)) + options.startTime
 }
 
 // Time 获取 ID 表示的标准时间类型值
@@ -360,7 +510,7 @@ func (f ID) Node(opts ...Option) int64 {
 	}
 	nodeMax := -1 ^ (-1 << options.nodeBits) // 1023
 	nodeMask := nodeMax << options.seqBits   // 4190208
-	// return int64(f) & (nodeMask >> options.nodeBits)
+
 	return int64(f) & int64(nodeMask) >> options.seqBits
 }
 
