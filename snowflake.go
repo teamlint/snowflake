@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -91,6 +92,8 @@ func (j JSONSyntaxError) Error() string {
 // Package
 
 func init() {
+	// log
+	log.SetOutput(ioutil.Discard)
 	// Base32
 	for i := 0; i < len(encodeBase32Map); i++ {
 		decodeBase32Map[i] = 0xFF
@@ -187,6 +190,14 @@ func NodeBits(nodeBits uint8) Option {
 func SeqBits(seqBits uint8) Option {
 	return func(o *Options) {
 		o.seqBits = seqBits
+	}
+}
+
+// Verbose 输出详细信息
+func Verbose() Option {
+	log.SetOutput(os.Stderr)
+	log.SetPrefix("[Snowflake]")
+	return func(o *Options) {
 	}
 }
 

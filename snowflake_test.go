@@ -40,7 +40,7 @@ func TestNew(t *testing.T) {
 func TestBits(t *testing.T) {
 	startTime, _ := time.Parse(time.RFC3339, "2020-01-02T15:04:05.678Z")
 	t.Log(startTime)
-	opts := []Option{NodeBits(9), StartTime(Epoch(startTime))}
+	opts := []Option{Verbose(), NodeBits(9), StartTime(Epoch(startTime))}
 	sf := MustNew(opts...)
 	id := sf.ID()
 	t.Logf("ID = %v, timestamp = %d, time = %v, elapsedTime = %v \n\n ", id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
