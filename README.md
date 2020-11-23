@@ -6,7 +6,7 @@ Snowflake is a distributed unique ID generator inspired by [Twitter's Snowflake]
 
 By default, a Snowflake ID is composed of
 * The ID as a whole is a 63 bit integer stored in an int64
-* 43 bits are used to store a timestamp with millisecond precision, using a custom epoch.default  is 1288834974657(UTC 2010-11-04 01:42:54). The lifetime (**278** years) is longer than that of [Twitter's Snowflake](https://blog.twitter.com/2010/announcing-snowflake) (69 years)
+* 43 bits are used to store a timestamp with millisecond precision, using a custom epoch.default  is 61026175693 (UTC 1971-12-08 15:42:55.693). The lifetime (**278** years) is longer than that of [Twitter's Snowflake](https://blog.twitter.com/2010/announcing-snowflake) (69 years)
 * 10 bits are used to store a node id - a range from 0 through 1023.
 * 10 bits are used to store a sequence number - a range from 0 through 1023.
 
@@ -20,7 +20,7 @@ New(NodeBits(16),SeqBits(6))
 
 ### Custom Start Time
 
-By default this package uses the Twitter Epoch of 1288834974657(UTC Nov 04 2010 01:42:54). You can set your own epoch value by `StartTime(startTime int64)` option function.
+By default this package uses the Twitter Epoch of 61026175693(UTC 1971-12-08 15:42:55.693). You can set your own epoch value by `StartTime(startTime int64)` option function.
 
 ### How it Works
 Each time you generate an ID, it works, like this.
@@ -74,7 +74,7 @@ The Option function:
 type Option func(*Options)
 
 type Options struct {
-	startTime int64 // 开始时间, 默认 1288834974657, 单位毫秒, UTC 时间 2010-11-04 01:42:54
+	startTime int64 // 开始时间
 	node      int64 // 节点 ID, 0 - 1023, 默认 0, 优先使用环境变量 SNOWFLAKE_NODE, 其次使用私有 IP 地址进行节点掩码计算
 
 	timeBits uint8 // 时间位数, 默认 43 位

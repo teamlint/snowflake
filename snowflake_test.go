@@ -42,7 +42,7 @@ func TestBits(t *testing.T) {
 	// startTime, _ := time.Parse(time.RFC3339, "2020-01-02T15:04:05.678Z")
 	// t.Log(startTime)
 	// opts := []Option{Verbose(), NodeBits(8), StartTime(Epoch(startTime))}
-	opts := []Option{Verbose(), SeqBits(10)}
+	opts := []Option{SeqBits(12)}
 	sf := MustNew(opts...)
 	id := sf.ID()
 	t.Logf("ID[%v] = %v, timestamp = %d, time = %v, elapsedTime = %v \n\n ", id.Node(opts...), id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
@@ -121,20 +121,19 @@ func TestRace(t *testing.T) {
 	opts := []Option{Node(1), SeqBits(10)}
 	sf := MustNew(opts...)
 
-	for j := 0; j < 1000; j++ {
+	for j := 0; j < 10; j++ {
 		go func(t *testing.T, j int, sf *Snowflake) {
 			// 不同协程使用不同节点 ID,避免同一时间产生相同 ID
 			// sf2 := MustNew(Node(int64(j)))
 			for i := 0; i < 100; i++ {
 				// id := sf2.ID()
 				// 如果使用多个routine,传入指定实例
-				// sf.ID()
-				id := sf.ID()
-				// t.Logf("[Race.Rou][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(), id.Node(), id.Seq())
-				t.Logf("[Race.Rou][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(opts...), id.Node(opts...), id.Seq(opts...))
+				sf.ID()
+				// id := sf.ID()
+				// t.Logf("[Race.Rou][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(opts...), id.Node(opts...), id.Seq(opts...))
 			}
 		}(t, j, sf)
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 10; i++ {
 			// sf.ID()
 			id := sf.ID()
 			t.Logf("[Race.For][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(opts...), id.Node(opts...), id.Seq(opts...))

@@ -21,7 +21,6 @@ import (
 // +--------------------------------------------------------------------------+
 
 const (
-	// DefaultStartTime int64 = 1288834974657 // 开始时间, UTC 时间 2010-11-04 01:42:54
 	DefaultStartTime int64 = 61026175693 // 开始时间, UTC 时间 1971-12-08 15:42:55.693
 	DefaultNodeBits  uint8 = 10          // 节点位数
 	DefaultSeqBits   uint8 = 10          // 序列位数
@@ -36,12 +35,12 @@ const (
 
 // Options 配置项
 type Options struct {
-	startTime int64 // 开始时间, 默认 1288834974657, 单位毫秒, UTC 时间 2010-11-04 01:42:54
+	startTime int64 // 开始时间
 	node      int64 // 节点 ID, 默认 0 - 1023
 
-	timeBits uint8 // 时间位数, 默认 42 位, 使用 41 位, 首位保留未使用
+	timeBits uint8 // 时间位数, 默认 43 位
 	nodeBits uint8 // 节点位数, 默认 10 位
-	seqBits  uint8 // 递增序列位数, 默认 12 位
+	seqBits  uint8 // 递增序列位数, 默认 10 位
 }
 
 type Option func(*Options)
