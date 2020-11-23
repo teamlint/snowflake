@@ -17,15 +17,16 @@ import (
 //********************************************************************************
 // Snowflake
 // +--------------------------------------------------------------------------+
-// | 1 Bit Unused | 41 Bit Timestamp |  10 Bit NodeID  |   12 Bit Sequence ID |
+// | 1 Bit Unused | 43 Bit Timestamp |  10 Bit NodeID  |   10 Bit Sequence ID |
 // +--------------------------------------------------------------------------+
 
 const (
-	DefaultStartTime int64 = 1288834974657 // 开始时间, UTC 时间 2010-11-04 01:42:54
-	DefaultNodeBits  uint8 = 10            // 节点位数
-	DefaultSeqBits   uint8 = 12            // 序列位数
-	MaxBits          uint8 = 64            // 最大位数
-	MaxNotTimeBits   uint8 = 22            // 最大非时间段位数
+	// DefaultStartTime int64 = 1288834974657 // 开始时间, UTC 时间 2010-11-04 01:42:54
+	DefaultStartTime int64 = 61026175693 // 开始时间, UTC 时间 1971-12-08 15:42:55.693
+	DefaultNodeBits  uint8 = 10          // 节点位数
+	DefaultSeqBits   uint8 = 10          // 序列位数
+	MaxBits          uint8 = 64          // 最大位数
+	MaxNotTimeBits   uint8 = 22          // 最大非时间段位数
 
 	EnvStartTime = "SNOWFLAKE_START_TIME" // 环境变量 开始时间
 	EnvNode      = "SNOWFLAKE_NODE"       // 环境变量 节点
@@ -352,10 +353,10 @@ func (sf *Snowflake) ID() ID {
 	elapsedTime := sf.elapsedTime()
 	if sf.time == elapsedTime {
 		sf.seq = (sf.seq + 1) & sf.seqMask
-		// 如果当前序列超出12bit长度,即大于4095，则需要等待下一毫秒
+		// 如果当前序列超出10bit长度,即大于1023，则需要等待下一毫秒
 		// 下一毫秒将使用sequence:0
 		if sf.seq == 0 {
-			for sf.time > elapsedTime {
+			for elapsedTime <= sf.time {
 				elapsedTime = sf.elapsedTime()
 			}
 		}
@@ -528,7 +529,7 @@ func (f ID) Node(opts ...Option) int64 {
 		opt(&options)
 	}
 	nodeMax := -1 ^ (-1 << options.nodeBits) // 1023
-	nodeMask := nodeMax << options.seqBits   // 4190208
+	nodeMask := nodeMax << options.seqBits   // 1023
 
 	return int64(f) & int64(nodeMask) >> options.seqBits
 }

@@ -42,22 +42,22 @@ func TestBits(t *testing.T) {
 	// startTime, _ := time.Parse(time.RFC3339, "2020-01-02T15:04:05.678Z")
 	// t.Log(startTime)
 	// opts := []Option{Verbose(), NodeBits(8), StartTime(Epoch(startTime))}
-	opts := []Option{Verbose(), NodeBits(9)}
+	opts := []Option{Verbose(), SeqBits(10)}
 	sf := MustNew(opts...)
 	id := sf.ID()
-	t.Logf("ID = %v, timestamp = %d, time = %v, elapsedTime = %v \n\n ", id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
+	t.Logf("ID[%v] = %v, timestamp = %d, time = %v, elapsedTime = %v \n\n ", id.Node(opts...), id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 5; i++ {
 		rand.Seed(time.Now().UnixNano())
 		maxNodeBits := uint8(rand.Intn(int(MaxNotTimeBits - 1)))
 		maxSeqBits := MaxNotTimeBits - maxNodeBits
 		t.Logf("maxNodeBits = %d, maxSeqBits = %d\n", maxNodeBits, maxSeqBits)
 		nodeBits := uint8(rand.Intn(int(maxNodeBits) + 1))
 		seqBits := uint8(rand.Intn(int(maxSeqBits)) + 1)
-		opts := []Option{Verbose(), NodeBits(nodeBits), SeqBits(seqBits)}
+		opts := []Option{NodeBits(nodeBits), SeqBits(seqBits)}
 		sf = MustNew(opts...)
 		id = sf.ID()
-		t.Logf("ID = %v, timestamp = %d, time = %v, elapsedTime = %v \n ", id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
+		t.Logf("ID[%v] = %v, timestamp = %d, time = %v, elapsedTime = %v \n\n ", id.Node(opts...), id.Int64(), id.Time(opts...), id.StdTime(opts...), id.Time(opts...)-sf.StartTime())
 	}
 }
 func TestEnv(t *testing.T) {
@@ -117,25 +117,27 @@ func TestDuplicateID(t *testing.T) {
 }
 
 func TestRace(t *testing.T) {
-	sf := MustNew(Node(1))
+	// opts := []Option{Node(1), SeqBits(8), Verbose()}
+	opts := []Option{Node(1), SeqBits(10)}
+	sf := MustNew(opts...)
 
-	for j := 0; j < 500; j++ {
+	for j := 0; j < 1000; j++ {
 		go func(t *testing.T, j int, sf *Snowflake) {
+			// 不同协程使用不同节点 ID,避免同一时间产生相同 ID
+			// sf2 := MustNew(Node(int64(j)))
 			for i := 0; i < 100; i++ {
-				// 不同实例 ID 会重复
-				// sf2 := MustNew(Node(1))
 				// id := sf2.ID()
 				// 如果使用多个routine,传入指定实例
-				sf.ID()
-				// id := sf.ID()
+				// sf.ID()
+				id := sf.ID()
 				// t.Logf("[Race.Rou][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(), id.Node(), id.Seq())
-				// log.Printf("[Race.Rou][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(), id.Node(), id.Seq())
+				t.Logf("[Race.Rou][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(opts...), id.Node(opts...), id.Seq(opts...))
 			}
 		}(t, j, sf)
-		for i := 0; i < 100; i++ {
-			sf.ID()
-			// id := sf.ID()
-			// log.Printf("[Race.For][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(), id.Node(), id.Seq())
+		for i := 0; i < 1000; i++ {
+			// sf.ID()
+			id := sf.ID()
+			t.Logf("[Race.For][%v.%v] ID=%v, [%13d|%04d|%04d]\n", j, i, id, id.Time(opts...), id.Node(opts...), id.Seq(opts...))
 		}
 	}
 
@@ -148,7 +150,7 @@ func TestRace(t *testing.T) {
 func TestPrintAll(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	id := sf.ID()
@@ -165,10 +167,37 @@ func TestPrintAll(t *testing.T) {
 
 }
 
+func TestTime(t *testing.T) {
+	sf, err := New()
+	if err != nil {
+		t.Fatalf("error creating Snowflake, %s", err)
+	}
+
+	id := sf.ID()
+	t.Logf("Snowflake now id[%d] timestamp = %v, std time = %v\n", id, id.Time(), id.StdTime())
+	var i int64 = 1
+	var max int64 = ^(-1 << 63)
+	// max = 1e19
+	t.Logf("max=%d\n", max)
+	for i < max {
+		oid := ParseInt64(i)
+		// bits := i / 10
+		if i < 0 {
+			break
+		}
+		if i >= 1e18 {
+			i = i + 1e18
+		} else {
+			i = i * 10
+		}
+		t.Logf("Snowflake node[%3d] id[%19d] timestamp = %13d, std time = %v\n", oid.Node(), oid, oid.Time(), oid.StdTime())
+	}
+}
+
 func TestInt64(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	oID := sf.ID()
@@ -179,7 +208,7 @@ func TestInt64(t *testing.T) {
 		t.Fatalf("pID %v != oID %v", pID, oID)
 	}
 
-	mi := int64(1329599227386400929) // db generated
+	mi := int64(332680650168468485) // db generated
 	pID = ParseInt64(mi)
 	if pID.Int64() != mi {
 		t.Fatalf("pID %v != mi %v", pID.Int64(), mi)
@@ -191,7 +220,7 @@ func TestInt64(t *testing.T) {
 func TestString(t *testing.T) {
 	node, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	oID := node.ID()
@@ -222,7 +251,7 @@ func TestString(t *testing.T) {
 func TestBase2(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	oID := sf.ID()
@@ -252,7 +281,7 @@ func TestBase2(t *testing.T) {
 func TestBase32(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	for i := 0; i < 100; i++ {
@@ -271,7 +300,7 @@ func TestBase32(t *testing.T) {
 func TestBase36(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	oID := sf.ID()
@@ -301,7 +330,7 @@ func TestBase36(t *testing.T) {
 func TestBase58(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	for i := 0; i < 10; i++ {
@@ -320,7 +349,7 @@ func TestBase58(t *testing.T) {
 func TestBase64(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	oID := sf.ID()
@@ -350,7 +379,7 @@ func TestBase64(t *testing.T) {
 func TestBytes(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	oID := sf.ID()
@@ -380,7 +409,7 @@ func TestBytes(t *testing.T) {
 func TestIntBytes(t *testing.T) {
 	sf, err := New()
 	if err != nil {
-		t.Fatalf("error creating NewNode, %s", err)
+		t.Fatalf("error creating Snowflake, %s", err)
 	}
 
 	oID := sf.ID()
